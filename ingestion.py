@@ -22,7 +22,7 @@ class Ingestion:
         self.output_file_format = 'document'
         self.chunk_size = 1024
         self.overlap_size = 0
-        self.workers = 5
+        self.workers = 16
         self.reader = FlatReader()
         self.embed_model_name = embed_model_name
         # colqwen/colpali/visrag(openbmb)
@@ -96,7 +96,7 @@ class Ingestion:
 
 if __name__ == '__main__':
     root_path = './data'
-    datasets = ['ExampleDataset', 'SlideVQA']
+    datasets = ['ExampleDataset', 'SlideVQA', "ViDoSeek"]
     for dataset in datasets:
         dataset_dir = os.path.join(root_path, dataset)
 

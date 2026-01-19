@@ -18,12 +18,12 @@ REC_MODEL_DIR='./en_PP-OCRv3_rec_infer'
 CLS_MODEL_DIR='./ch_ppocr_mobile_v2.0_cls_infer'
 REC_LABEL_FILE='./en_dict.txt'
 
-dataset_name = 'ViDoSeek' # dataset name
+dataset_name = 'SlideVQA' # dataset name
 # Input image path
 IMAGE_PATH = f'./data/{dataset_name}/img'  # Write your image path here
 
 # Inference device configuration
-BACKEND = "cpu"  # Options: "gpu" or "cpu"
+BACKEND = "gpu"  # Options: "gpu" or "cpu"
 DEVICE_ID = 0     # Set GPU device ID if using GPU
 
 # Other parameters

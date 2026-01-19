@@ -17,7 +17,7 @@ from vidorag_agents import ViDoRAG_Agents
 
 class MMRAG:
     def __init__(self,
-                dataset='ExampleDataset',
+                dataset='ViDoSeek',
                 query_file='rag_dataset.json',
                 experiment_type = 'retrieval_infer',
                 generate_vlm='qwen-vl-max',
