@@ -59,7 +59,7 @@ def gmm(recall_result: list[NodeWithScore], input_length: int=20, max_valid_leng
     return valid_recall_result
 
 class SearchEngine:
-    def __init__(self,dataset, node_dir_prefix=None,embed_model_name='BAAI/bge-m3'):# nvidia/NV-Embed-v2 "vidore/colqwen2-v0.1"
+    def __init__(self,dataset, node_dir_prefix=None,embed_model_name='BAAI/bge-m3', retriever_device='cuda:0'):# nvidia/NV-Embed-v2 "vidore/colqwen2-v0.1"
         Settings.llm = None
         self.gmm=False
         self.gmm_candidate_length = False
@@ -92,13 +92,14 @@ class SearchEngine:
         self.rag_dataset_path = os.path.join(self.dataset_dir, 'rag_dataset.json')
         self.workers = 1
         self.embed_model_name = embed_model_name
+        self.retriever_device = retriever_device
         if 'vidore' in embed_model_name or 'openbmb' in embed_model_name:
             if self.vl_ret:
-                self.vector_embed_model = VL_Embedding(model=embed_model_name, mode='image')
+                self.vector_embed_model = VL_Embedding(model=embed_model_name, mode='image', device=self.retriever_device)
             else:
-                self.vector_embed_model = VL_Embedding(model=embed_model_name, mode='text')
+                self.vector_embed_model = VL_Embedding(model=embed_model_name, mode='text', device=self.retriever_device)
         else:
-            self.vector_embed_model = HuggingFaceEmbedding(model_name=self.embed_model_name, embed_batch_size=10, max_length=512, trust_remote_code=True, device='cuda')
+            self.vector_embed_model = HuggingFaceEmbedding(model_name=self.embed_model_name, embed_batch_size=10, max_length=512, trust_remote_code=True, device=self.retriever_device)
         self.recall_num = 100
         self.query_engine = self.load_query_engine()
         self.output_dir = os.path.join(self.dataset_dir, 'search_output')
@@ -224,13 +225,14 @@ class HybridSearchEngine:
                  embed_model_name_vl = 'vidore/colqwen2-v1.0',
                  embed_model_name_text = 'BAAI/bge-m3',
                  topk=10,
-                 gmm=False):
+                 gmm=False,
+                 retriever_device='cuda:0'):
         self.dataset = dataset
         self.dataset_dir = os.path.join('./data', dataset)
         self.img_dir = os.path.join(self.dataset_dir, 'img')
         self.ppocr_dir = os.path.join(self.dataset_dir, 'bge_ingestion')
-        self.engine_vl = SearchEngine(dataset,node_dir_prefix=node_dir_prefix_vl,embed_model_name=embed_model_name_vl)
-        self.engine_text = SearchEngine(dataset,node_dir_prefix=node_dir_prefix_text,embed_model_name=embed_model_name_text)
+        self.engine_vl = SearchEngine(dataset,node_dir_prefix=node_dir_prefix_vl,embed_model_name=embed_model_name_vl, retriever_device=retriever_device)
+        self.engine_text = SearchEngine(dataset,node_dir_prefix=node_dir_prefix_text,embed_model_name=embed_model_name_text, retriever_device=retriever_device)
         self.topk = topk
         self.gmm = gmm
     

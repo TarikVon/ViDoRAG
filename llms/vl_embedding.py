@@ -56,6 +56,7 @@ class VL_Embedding(MultiModalEmbedding):
     embed_model: Union[ColQwen2, AutoModel, None] = Field(default=None)
     processor: Optional[ColQwen2Processor] = Field(default=None)
     tokenizer: Optional[AutoTokenizer] = Field(default=None)
+    _device: str = PrivateAttr(default="cuda:0")
 
     def __init__(
         self,
@@ -64,6 +65,7 @@ class VL_Embedding(MultiModalEmbedding):
         timeout: Optional[int] = None,
         callback_manager: Optional[CallbackManager] = None,
         mode: str = "text",
+        device: str = "cuda:0",
         **kwargs: Any,
     ) -> None:
         super().__init__(
@@ -76,6 +78,7 @@ class VL_Embedding(MultiModalEmbedding):
 
         self.mode = mode
 
+        self._device = device
         if "openbmb" in model:
             self.tokenizer = AutoTokenizer.from_pretrained(
                 model, trust_remote_code=True
@@ -85,9 +88,9 @@ class VL_Embedding(MultiModalEmbedding):
                     model,
                     torch_dtype=torch.bfloat16,
                     trust_remote_code=True,
-                    device_map="cuda:1",
+                    device_map=self._device,
                 )
-                .cuda()
+                .to(self._device)
                 .eval()
             )
             # self.embed_model.eval()
@@ -95,14 +98,14 @@ class VL_Embedding(MultiModalEmbedding):
             self.embed_model = ColQwen2.from_pretrained(
                 model,
                 torch_dtype=torch.bfloat16,
-                device_map="cuda",  # or "mps" if on Apple Silicon
+                device_map=self._device,  # or "mps" if on Apple Silicon
             ).eval()
             self.processor = ColQwen2Processor.from_pretrained(model)
         elif "vidore" in model and "pali" in model:
             self.embed_model = ColPali.from_pretrained(
                 model,
                 torch_dtype=torch.bfloat16,
-                device_map="cuda",  # or "mps" if on Apple Silicon
+                device_map=self._device,  # or "mps" if on Apple Silicon
             ).eval()
             self.processor = ColPaliProcessor.from_pretrained(model)
 

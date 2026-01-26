@@ -40,17 +40,23 @@ class Seeker:
                 # return None, None, None
                 raise Exception('seeker time out')
             times += 1
-            select_response = self.vlm.generate(query=prompt, image=input_images)
+            select_response = self.vlm.generate(query=prompt, image=input_images, mode="seeker")
             print(select_response)
             try:
                 select_response_json = extract_json(select_response)
                 reason = select_response_json.get('reason', None)
                 summary = select_response_json.get('summary', None)
                 select_page_num = select_response_json.get('choice', None)
-                if reason is None or summary is None or any([page >= len(self.buffer_images) for page in select_page_num]):
-                    raise Exception(f'select json format error: length: {len(self.buffer_images)}')
+                if reason is None or summary is None or select_page_num is None:
+                    raise Exception('select json format error: missing fields')
 
-                selected_images = [self.buffer_images[page] for page in select_page_num]
+                valid_page_num = [page for page in select_page_num if page < len(self.buffer_images)]
+                if len(valid_page_num) < len(select_page_num):
+                    print(f"Warning: Filtered out invalid indices {select_page_num} for buffer length {len(self.buffer_images)}")
+                if len(valid_page_num) == 0:
+                    raise Exception(f'select json format error: no valid indices for length {len(self.buffer_images)}')
+
+                selected_images = [self.buffer_images[page] for page in valid_page_num]
                 self.buffer_images = [image for image in self.buffer_images if image not in selected_images]
 
             except Exception as e:
@@ -97,7 +103,7 @@ class Inspector:
                 # return None, None, None
             times +=1
 
-            response = self.vlm.generate(query=prompt,image=input_images)
+            response = self.vlm.generate(query=prompt,image=input_images, mode="inspector")
             print(response)
             try:
                 response_json = extract_json(response)
@@ -151,7 +157,7 @@ class Synthesizer:
             input_images = [concat_images_with_bbox(ref_images, arrangement=arrangement_map_dict[len(ref_images)], scale=1, line_width=40)]
         
         while True:
-            final_answer_response = self.vlm.generate(query=prompt,image=input_images)
+            final_answer_response = self.vlm.generate(query=prompt,image=input_images, mode="synthesizer")
             print(final_answer_response)
             try:
                 final_answer_response_json = extract_json(final_answer_response)
@@ -195,7 +201,7 @@ class ViDoRAG_Agents:
 
 if __name__ == '__main__':
     from llms.llm import LLM
-    vlm = LLM('gpt-4o')
+    vlm = LLM('openbmb/EVisRAG-7B')
     agent = ViDoRAG_Agents(vlm)
     re=agent.run_agent(query='Who is Tim?', images_path=['./data/ExampleDataset/img/00a76e3a9a36255616e2dc14a6eb5dde598b321f_1.jpg','./data/ExampleDataset/img/00a76e3a9a36255616e2dc14a6eb5dde598b321f_2.jpg','./data/ExampleDataset/img/00a76e3a9a36255616e2dc14a6eb5dde598b321f_3.jpg','./data/ExampleDataset/img/00a76e3a9a36255616e2dc14a6eb5dde598b321f_4.jpg'])
     print(re)

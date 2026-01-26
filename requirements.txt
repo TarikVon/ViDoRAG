@@ -11,6 +11,7 @@ torchvision
 transformers>=4.49.0
 qwen-vl-utils
 setuptools
+vllm
 llama-cloud==0.1.5
 llama-index==0.12.0
 llama-index-agent-openai==0.4.0

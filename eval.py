@@ -26,13 +26,15 @@ class MMRAG:
                 embed_model_name_text=None, # nvidia/NV-Embed-v2 BAAI/bge-m3
                 workers_num = 1,
                 topk=10,
-                max_samples=None):
+                max_samples=None,
+                retriever_device='cuda:1'):
         self.experiment_type = experiment_type
         self.workers_num = workers_num
         self.top_k = topk
         self.dataset = dataset
         self.query_file = query_file
         self.max_samples = max_samples
+        self.retriever_device = retriever_device
         self.dataset_dir = os.path.join('./data', dataset)
         self.img_dir = os.path.join(self.dataset_dir, "img")
         self.results_dir = os.path.join(self.dataset_dir, "results")
@@ -46,9 +48,10 @@ class MMRAG:
             self.search_engine = HybridSearchEngine(self.dataset,
                                                     embed_model_name_vl=embed_model_name_vl,
                                                     embed_model_name_text=embed_model_name_text,
-                                                    topk=topk)
+                                                    topk=topk,
+                                                    retriever_device=self.retriever_device)
         else:
-            self.search_engine = SearchEngine(self.dataset, embed_model_name=embed_model_name)
+            self.search_engine = SearchEngine(self.dataset, embed_model_name=embed_model_name, retriever_device=self.retriever_device)
 
         # retrieval only
         if experiment_type == 'retrieval_infer':
@@ -178,6 +181,7 @@ def arg_parse():
     parser.add_argument("--embed_model_name_text", type=str, default=None, help="The name of embedding model for text")
     parser.add_argument("--generate_vlm", type=str, default='qwen-vl-max', help="The name of VLM model")
     parser.add_argument("--max_samples", type=int, default=None, help="Limit number of eval samples")
+    parser.add_argument("--retriever_device", type=str, default='cuda:1', help="Retriever embedding device, e.g., cuda:1")
     args = parser.parse_args()
     return args
 
@@ -193,7 +197,8 @@ if __name__ == "__main__":
         embed_model_name_vl=args.embed_model_name_vl,
         embed_model_name_text=args.embed_model_name_text,
         generate_vlm=args.generate_vlm,
-        max_samples=args.max_samples
+        max_samples=args.max_samples,
+        retriever_device=args.retriever_device
     )
     mmrag.eval_dataset()
     mmrag.eval_overall()

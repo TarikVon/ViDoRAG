@@ -159,11 +159,12 @@ Optionally, you can choose to test these features in `search_engine.py`.
 You can directly use our script for generation in `vidorag_agents.py`, or you can integrate it into your own framework:
 ```python
 from llms.llm import LLM
-vlm = LLM('qwen-vl-max')
+vlm = LLM('openbmb/EVisRAG-7B')
 agent = ViDoRAG_Agents(vlm)
 answer=agent.run_agent(query='Who is Tim?', images_path=['./data/ExampleDataset/img/00a76e3a9a36255616e2dc14a6eb5dde598b321f_1.jpg','./data/ExampleDataset/img/00a76e3a9a36255616e2dc14a6eb5dde598b321f_2.jpg'])
 print(answer)
 ```
+Note: `openbmb/EVisRAG-7B` uses vLLM for inference. Install `vllm` and ensure your GPU setup supports it. By default, it truncates inputs to 5 images per prompt.
 
 ### Step4. Run Evaluation 
 For our end-to-end evaluation, we employed a LLM-based assessment:

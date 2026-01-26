@@ -9,7 +9,7 @@ import os
 
 def _encode_image(image_path):
     if isinstance(image_path,Image.Image):
-        buffered = io.BytesIO()
+        buffered = BytesIO()
         image_path.save(buffered, format="JPEG")
         img_data = buffered.getvalue()
         base64_encoded = base64.b64encode(img_data).decode("utf-8")
@@ -17,6 +17,37 @@ def _encode_image(image_path):
     else:
         with open(image_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode("utf-8")
+
+def evidence_prompt_grpo(query):
+    return f"""You are an AI Visual QA assistant. I will provide you with a question and several images. Please follow the four steps below:
+
+Step 1: Observe the Images
+First, analyze the question and consider what types of images may contain relevant information. Then, examine each image one by one, paying special attention to aspects related to the question. Identify whether each image contains any potentially relevant information.
+Wrap your observations within <observe></observe> tags.
+
+Step 2: Record Evidences from Images
+After reviewing all images, record the evidence you find for each image within <evidence></evidence> tags.
+If you are certain that an image contains no relevant information, record it as: [i]: no relevant information(where i denotes the index of the image).
+If an image contains relevant evidence, record it as: [j]: [the evidence you find for the question](where j is the index of the image).
+
+Step 3: Reason Based on the Question and Evidences
+Based on the recorded evidences, reason about the answer to the question.
+Include your step-by-step reasoning within <think></think> tags.
+
+Step 4: Answer the Question
+Provide your final answer based only on the evidences you found in the images.
+Wrap your answer within <answer></answer> tags.
+Avoid adding unnecessary contents in your final answer, like if the question is a yes/no question, simply answer "yes" or "no".
+If none of the images contain sufficient information to answer the question, respond with <answer>insufficient to answer</answer>.
+
+Formatting Requirements:
+Use the exact tags <observe>, <evidence>, <think>, and <answer> for structured output.
+It is possible that none, one, or several images contain relevant evidence.
+If you find no evidence or few evidences, and insufficient to help you answer the question, follow the instructions above for insufficient information.
+
+Question and images are provided below. Please follow the steps as instructed.
+Question: {query}
+"""
 
 class Qwen_VL_2_5:
     def __init__(self, model_name="Qwen/Qwen2.5-VL-7B-Instruct"):
@@ -65,12 +96,63 @@ class Qwen_VL_2_5:
 
         return output_text[0]
     
+class EVisRAG_7B:
+    def __init__(self, model_name="openbmb/EVisRAG-7B", tensor_parallel_size=1, dtype="bfloat16", max_images=5):
+        from transformers import AutoProcessor
+        from vllm import LLM as VLLM
+        self.processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True, padding_side="left")
+        self.llm = VLLM(
+            model=model_name,
+            tensor_parallel_size=tensor_parallel_size,
+            dtype=dtype,
+            limit_mm_per_prompt={"image": max_images, "video": 0},
+        )
+        self.max_images = max_images
+
+    def generate(self, query, images, sampling_params=None, mode="synthesizer"):
+        from vllm import SamplingParams
+        from qwen_vl_utils import process_vision_info
+
+        if images is None:
+            images = []
+        if len(images) > self.max_images:
+            images = images[: self.max_images]
+
+        if mode == "synthesizer":
+            input_prompt = evidence_prompt_grpo(query)
+        else:
+            input_prompt = query
+        content = [{"type": "text", "text": input_prompt}]
+        for img in images:
+            content.append({"type": "image", "image": img})
+
+        msg = [{"role": "user", "content": content}]
+        prompt = self.processor.apply_chat_template(msg, tokenize=False, add_generation_prompt=True)
+        image_inputs, _ = process_vision_info(msg)
+
+        msg_input = [{
+            "prompt": prompt,
+            "multi_modal_data": {"image": image_inputs},
+        }]
+
+        if sampling_params is None:
+            sampling_params = SamplingParams(
+                temperature=0.1,
+                repetition_penalty=1.05,
+                max_tokens=2048,
+            )
+
+        output_texts = self.llm.generate(msg_input, sampling_params=sampling_params)
+        return output_texts[0].outputs[0].text
+
         
 class LLM:
     def __init__(self,model_name):
         self.model_name =model_name
         if 'Qwen2.5-VL' in self.model_name:
             self.model = Qwen_VL_2_5(model_name)
+        elif 'EVisRAG' in self.model_name:
+            self.model = EVisRAG_7B(model_name)
         elif model_name.startswith('gpt'):
             from openai import OpenAI
             self.model = OpenAI()
@@ -79,9 +161,12 @@ class LLM:
         query = kwargs.get('query','')
         image = kwargs.get('image','')
         model_name = kwargs.get('model_name','')
+        mode = kwargs.get('mode', 'synthesizer')
 
         if 'Qwen2.5-VL' in self.model_name:
             return self.model.generate(query,image)
+        elif 'EVisRAG' in self.model_name:
+            return self.model.generate(query,image,mode=mode)
         elif self.model_name.startswith('gpt'):
             content = [{
                 "type": "text",
