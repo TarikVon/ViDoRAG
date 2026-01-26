@@ -25,12 +25,14 @@ class MMRAG:
                 embed_model_name_vl=None, # openbmb/VisRAG-Ret vidore/colqwen2-v1.0
                 embed_model_name_text=None, # nvidia/NV-Embed-v2 BAAI/bge-m3
                 workers_num = 1,
-                topk=10):
+                topk=10,
+                max_samples=None):
         self.experiment_type = experiment_type
         self.workers_num = workers_num
         self.top_k = topk
         self.dataset = dataset
         self.query_file = query_file
+        self.max_samples = max_samples
         self.dataset_dir = os.path.join('./data', dataset)
         self.img_dir = os.path.join(self.dataset_dir, "img")
         self.results_dir = os.path.join(self.dataset_dir, "results")
@@ -111,6 +113,9 @@ class MMRAG:
             uid_already = [item['uid'] for item in results]
             data = [item for item in data if item['uid'] not in uid_already]
             
+        if getattr(self, "max_samples", None) is not None:
+            data = data[: self.max_samples]
+            
         if self.workers_num == 1:
             for item in tqdm(data):
                 result = eval_func(item)
@@ -172,6 +177,7 @@ def arg_parse():
     parser.add_argument("--embed_model_name_vl", type=str, default=None, help="The name of embedding model for vl")
     parser.add_argument("--embed_model_name_text", type=str, default=None, help="The name of embedding model for text")
     parser.add_argument("--generate_vlm", type=str, default='qwen-vl-max', help="The name of VLM model")
+    parser.add_argument("--max_samples", type=int, default=None, help="Limit number of eval samples")
     args = parser.parse_args()
     return args
 
@@ -186,7 +192,8 @@ if __name__ == "__main__":
         topk=args.topk,
         embed_model_name_vl=args.embed_model_name_vl,
         embed_model_name_text=args.embed_model_name_text,
-        generate_vlm=args.generate_vlm
+        generate_vlm=args.generate_vlm,
+        max_samples=args.max_samples
     )
     mmrag.eval_dataset()
     mmrag.eval_overall()

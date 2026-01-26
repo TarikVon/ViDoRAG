@@ -12,7 +12,7 @@ from utils.image_preprosser import concat_images_with_bbox
 class Seeker:
     def __init__(self, vlm):
         self.vlm = vlm
-        self.seeker_multi_image = False
+        self.seeker_multi_image = True
 
         if self.seeker_multi_image:
             self.page_map = page_map_dict_normal
@@ -65,7 +65,7 @@ class Seeker:
 class Inspector:
     def __init__(self, vlm):
         self.vlm = vlm
-        self.inspector_multi_image = False
+        self.inspector_multi_image = True
 
         if self.inspector_multi_image:
             self.page_map = page_map_dict_normal
@@ -134,7 +134,7 @@ class Inspector:
 class Synthesizer:
     def __init__(self, vlm):
         self.vlm = vlm
-        self.synthesizer_multi_image = False
+        self.synthesizer_multi_image = True
         if self.synthesizer_multi_image:
             self.page_map = page_map_dict_normal
         else:
@@ -195,7 +195,7 @@ class ViDoRAG_Agents:
 
 if __name__ == '__main__':
     from llms.llm import LLM
-    vlm = LLM('qwen-vl-max')
+    vlm = LLM('gpt-4o')
     agent = ViDoRAG_Agents(vlm)
     re=agent.run_agent(query='Who is Tim?', images_path=['./data/ExampleDataset/img/00a76e3a9a36255616e2dc14a6eb5dde598b321f_1.jpg','./data/ExampleDataset/img/00a76e3a9a36255616e2dc14a6eb5dde598b321f_2.jpg','./data/ExampleDataset/img/00a76e3a9a36255616e2dc14a6eb5dde598b321f_3.jpg','./data/ExampleDataset/img/00a76e3a9a36255616e2dc14a6eb5dde598b321f_4.jpg'])
     print(re)
