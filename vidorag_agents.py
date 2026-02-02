@@ -50,12 +50,12 @@ class Seeker:
                 if reason is None or summary is None or select_page_num is None:
                     raise Exception('select json format error: missing fields')
 
-                valid_page_num = [page for page in select_page_num if page < len(self.buffer_images)]
-                if len(valid_page_num) < len(select_page_num):
-                    print(f"Warning: Filtered out invalid indices {select_page_num} for buffer length {len(self.buffer_images)}")
-                if len(valid_page_num) == 0:
-                    raise Exception(f'select json format error: no valid indices for length {len(self.buffer_images)}')
-
+                valid_page_num = _normalize_indices(
+                    select_page_num,
+                    len(self.buffer_images),
+                    label="indices",
+                    empty_fallback="all",
+                )
                 selected_images = [self.buffer_images[page] for page in valid_page_num]
                 self.buffer_images = [image for image in self.buffer_images if image not in selected_images]
 
@@ -119,17 +119,27 @@ class Inspector:
                 if reason is None:
                     raise Exception('answer no reason')
                 elif answer is not None and ref is not None:
-                    if any([page >= len(self.buffer_images) for page in ref]) or len(ref)==0:
-                        raise Exception('ref error')
-                    if len(ref) == len(self.buffer_images):
+                    valid_ref = _normalize_indices(
+                        ref,
+                        len(self.buffer_images),
+                        label="reference",
+                        empty_fallback="error",
+                    )
+                    if len(valid_ref) == len(self.buffer_images):
                         return 'answer', answer, self.buffer_images
                     else:
-                        ref_images = [self.buffer_images[page] for page in ref]
+                        ref_images = [self.buffer_images[page] for page in valid_ref]
                         return 'synthesizer', answer, ref_images
                 elif info is not None and choice is not None:
-                    if any([page >= len(self.buffer_images) for page in choice]):
-                        raise Exception('choice error')
-                    self.buffer_images = [self.buffer_images[page] for page in choice]
+                    if len(choice) == 0:
+                        return 'seeker', info, self.buffer_images
+                    valid_choice = _normalize_indices(
+                        choice,
+                        len(self.buffer_images),
+                        label="choice",
+                        empty_fallback="error",
+                    )
+                    self.buffer_images = [self.buffer_images[page] for page in valid_choice]
                     return 'seeker', info, self.buffer_images
             
             except Exception as e:
@@ -163,8 +173,8 @@ class Synthesizer:
                 final_answer_response_json = extract_json(final_answer_response)
                 reason = final_answer_response_json.get('reason',None)
                 answer = final_answer_response_json.get('answer',None)
-                if reason is None or answer is None :
-                    raise Exception('Synthesizer time out')
+                if reason is None or answer is None:
+                    raise Exception('answer missing')
                 return reason, answer
             except Exception as e:
                 print(e)
@@ -197,7 +207,28 @@ class ViDoRAG_Agents:
                 continue
             else:
                 print('No related information')
-                return None
+        return None
+
+def _normalize_indices(indices, buffer_len, label="indices", empty_fallback="error"):
+    valid_indices = [page for page in indices if page < buffer_len]
+    if len(valid_indices) < len(indices):
+        # Heuristic: model may be using 1-based indices.
+        if all(isinstance(p, int) for p in indices) and min(indices) >= 1 and max(indices) <= buffer_len:
+            valid_indices = [p - 1 for p in indices]
+            print(f"Warning: Converted 1-based {label} {indices} to 0-based for length {buffer_len}")
+        else:
+            print(f"Warning: Filtered out invalid {label} {indices} for buffer length {buffer_len}")
+    if len(valid_indices) == 0:
+        if empty_fallback == "all":
+            print(f"Warning: Empty {label}; falling back to all {buffer_len} images")
+            valid_indices = list(range(buffer_len))
+        else:
+            raise Exception(f'{label} error')
+
+    # de-duplicate while preserving order
+    seen = set()
+    valid_indices = [p for p in valid_indices if not (p in seen or seen.add(p))]
+    return valid_indices
 
 if __name__ == '__main__':
     from llms.llm import LLM

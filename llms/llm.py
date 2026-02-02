@@ -19,33 +19,24 @@ def _encode_image(image_path):
             return base64.b64encode(image_file.read()).decode("utf-8")
 
 def evidence_prompt_grpo(query):
-    return f"""You are an AI Visual QA assistant. I will provide you with a question and several images. Please follow the four steps below:
+    return f"""You are an AI Visual QA assistant. I will provide you with a question and several images. Please reason step-by-step and respond ONLY in valid JSON with the following schema:
+{{
+  "reason": "your step-by-step reasoning",
+  "evidence": [
+    {{
+      "image_index": 0,
+      "content": "evidence text or 'no relevant information'"
+    }}
+  ],
+  "answer": "final answer or 'insufficient to answer'"
+}}
 
-Step 1: Observe the Images
-First, analyze the question and consider what types of images may contain relevant information. Then, examine each image one by one, paying special attention to aspects related to the question. Identify whether each image contains any potentially relevant information.
-Wrap your observations within <observe></observe> tags.
+Rules:
+- Use 0-based image indices.
+- If an image has no relevant information, set its content to "no relevant information".
+- The answer must be based only on evidence. For yes/no questions, answer "yes" or "no".
+- If none of the images contain sufficient information, set answer to "insufficient to answer".
 
-Step 2: Record Evidences from Images
-After reviewing all images, record the evidence you find for each image within <evidence></evidence> tags.
-If you are certain that an image contains no relevant information, record it as: [i]: no relevant information(where i denotes the index of the image).
-If an image contains relevant evidence, record it as: [j]: [the evidence you find for the question](where j is the index of the image).
-
-Step 3: Reason Based on the Question and Evidences
-Based on the recorded evidences, reason about the answer to the question.
-Include your step-by-step reasoning within <think></think> tags.
-
-Step 4: Answer the Question
-Provide your final answer based only on the evidences you found in the images.
-Wrap your answer within <answer></answer> tags.
-Avoid adding unnecessary contents in your final answer, like if the question is a yes/no question, simply answer "yes" or "no".
-If none of the images contain sufficient information to answer the question, respond with <answer>insufficient to answer</answer>.
-
-Formatting Requirements:
-Use the exact tags <observe>, <evidence>, <think>, and <answer> for structured output.
-It is possible that none, one, or several images contain relevant evidence.
-If you find no evidence or few evidences, and insufficient to help you answer the question, follow the instructions above for insufficient information.
-
-Question and images are provided below. Please follow the steps as instructed.
 Question: {query}
 """
 
@@ -162,6 +153,9 @@ class LLM:
         image = kwargs.get('image','')
         model_name = kwargs.get('model_name','')
         mode = kwargs.get('mode', 'synthesizer')
+        if os.getenv("VIDORAG_DEBUG") == "1":
+            img_count = len(image) if isinstance(image, list) else (1 if image else 0)
+            print(f"[VIDORAG_DEBUG] model={self.model_name} mode={mode} images={img_count}")
 
         if 'Qwen2.5-VL' in self.model_name:
             return self.model.generate(query,image)
