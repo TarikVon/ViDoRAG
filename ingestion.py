@@ -15,7 +15,7 @@ from llama_index.core import SimpleDirectoryReader
 from llms.vl_embedding import VL_Embedding
 
 class Ingestion:
-    def __init__(self, dataset_dir,input_prefix='ppocr',output_prefix='bge_ingestion',embed_model_name='BAAI/bge-m3'):
+    def __init__(self, dataset_dir,input_prefix='ppocr',output_prefix='visrag_ingestion',embed_model_name='openbmb/VisRAG-Ret'):
         self.dataset_dir = dataset_dir
         self.input_dir  = os.path.join(dataset_dir, input_prefix)
         self.output_dir = os.path.join(dataset_dir, output_prefix)
@@ -103,9 +103,9 @@ if __name__ == '__main__':
         # select a embedding model
         # ingestion = Ingestion(dataset_dir,input_prefix='img',output_prefix='colqwen_ingestion',embed_model_name='vidore/colqwen2-v1.0') # colqwen2
         # ingestion = Ingestion(dataset_dir,input_prefix='img',output_prefix='colpali_ingestion',embed_model_name='vidore/colpali-v1.2') # colpali
-        # ingestion = Ingestion(dataset_dir,input_prefix='img',output_prefix='visrag_ingestion',embed_model_name='openbmb/VisRAG-Ret') # visrag
+        ingestion = Ingestion(dataset_dir,input_prefix='img',output_prefix='visrag_ingestion',embed_model_name='openbmb/VisRAG-Ret') # visrag
         # ingestion = Ingestion(dataset_dir,input_prefix='ppocr',output_prefix='nv_ingestion',embed_model_name='nvidia/NV-Embed-v2') # nv-embed
-        ingestion = Ingestion(dataset_dir,input_prefix='ppocr',output_prefix='bge_ingestion',embed_model_name='BAAI/bge-m3') # bge-m3
+        # ingestion = Ingestion(dataset_dir,input_prefix='ppocr',output_prefix='bge_ingestion',embed_model_name='BAAI/bge-m3') # bge-m3
 
         # run
         ingestion.ingestion_multi_session()

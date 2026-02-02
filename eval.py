@@ -21,7 +21,7 @@ class MMRAG:
                 query_file='rag_dataset.json',
                 experiment_type = 'retrieval_infer',
                 generate_vlm='qwen-vl-max',
-                embed_model_name='BAAI/bge-m3',
+                embed_model_name='openbmb/VisRAG-Ret',
                 embed_model_name_vl=None, # openbmb/VisRAG-Ret vidore/colqwen2-v1.0
                 embed_model_name_text=None, # nvidia/NV-Embed-v2 BAAI/bge-m3
                 workers_num = 1,
@@ -174,7 +174,7 @@ def arg_parse():
     parser.add_argument("--dataset", type=str, default='ExampleDataset', help="The name of dataset")
     parser.add_argument("--query_file", type=str, default='rag_dataset.json', help="The name of anno_file")
     parser.add_argument("--experiment_type", type=str, default='retrieval_infer', help="The type of experiment")
-    parser.add_argument("--embed_model_name", type=str, default='BAAI/bge-m3', help="The name of embedding model")
+    parser.add_argument("--embed_model_name", type=str, default='openbmb/VisRAG-Ret', help="The name of embedding model")
     parser.add_argument("--workers_num", type=int, default=1, help="The number of workers")
     parser.add_argument("--topk", type=int, default=10, help="The number of topk")
     parser.add_argument("--embed_model_name_vl", type=str, default=None, help="The name of embedding model for vl")

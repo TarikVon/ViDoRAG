@@ -60,7 +60,7 @@ class VL_Embedding(MultiModalEmbedding):
 
     def __init__(
         self,
-        model: str = "vidore/colqwen2-v1.0",
+        model: str = "openbmb/VisRAG-Ret",
         dimensions: Optional[int] = 1024,
         timeout: Optional[int] = None,
         callback_manager: Optional[CallbackManager] = None,

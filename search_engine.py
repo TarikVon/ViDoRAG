@@ -59,7 +59,7 @@ def gmm(recall_result: list[NodeWithScore], input_length: int=20, max_valid_leng
     return valid_recall_result
 
 class SearchEngine:
-    def __init__(self,dataset, node_dir_prefix=None,embed_model_name='BAAI/bge-m3', retriever_device='cuda:0'):# nvidia/NV-Embed-v2 "vidore/colqwen2-v0.1"
+    def __init__(self,dataset, node_dir_prefix=None,embed_model_name='openbmb/VisRAG-Ret', retriever_device='cuda:0'):# nvidia/NV-Embed-v2 "vidore/colqwen2-v0.1"
         Settings.llm = None
         self.gmm=False
         self.gmm_candidate_length = False
@@ -222,7 +222,7 @@ class HybridSearchEngine:
                  dataset,
                  node_dir_prefix_vl = None,
                  node_dir_prefix_text = None,
-                 embed_model_name_vl = 'vidore/colqwen2-v1.0',
+                 embed_model_name_vl = 'openbmb/VisRAG-Ret',
                  embed_model_name_text = 'BAAI/bge-m3',
                  topk=10,
                  gmm=False,
