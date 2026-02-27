@@ -63,6 +63,53 @@ def eval_sample(example):
     
     file_name = example['meta_info']['file_name']
 
+def _extract_relevant_and_retrieved(example):
+    if example.get('meta_info') is None:
+        return None, None
+    file_name = example['meta_info'].get('file_name')
+    reference_page = example['meta_info'].get('reference_page')
+    if file_name is None or reference_page is None:
+        return None, None
+    file_name = file_name.split('.')[0]
+    reference_page = [str(page) for page in reference_page]
+    relevant_docs = [file_name + '_' + page for page in reference_page]
+
+    recall_results = example.get('recall_results')
+    if recall_results is None:
+        return relevant_docs, None
+    retrieved_docs = []
+    if 'source_nodes' in recall_results:
+        nodes = recall_results['source_nodes']
+    else:
+        nodes = recall_results
+    for node in nodes:
+        if 'node' in node:
+            retrieved_docs.append(os.path.basename(node['node']['metadata'].get('filename', node['node']['metadata'].get('file_name'))))
+        else:
+            retrieved_docs.append(os.path.basename(node['metadata']['file_path']))
+    retrieved_docs = [doc.split('.')[0] for doc in retrieved_docs]
+    return relevant_docs, retrieved_docs
+
+def eval_sample_search(example, ks=(-1, 1, 5, 10)):
+    relevant_docs, retrieved_docs = _extract_relevant_and_retrieved(example)
+    if relevant_docs is None or retrieved_docs is None or len(relevant_docs) == 0:
+        return {}
+    relevant_docs_list = [relevant_docs]
+    retrieved_docs_list = [retrieved_docs]
+    results = {}
+    for k in ks:
+        recall = recall_at_k(relevant_docs_list, retrieved_docs_list, k)
+        hit_rate = hit_rate_at_k(relevant_docs_list, retrieved_docs_list, k)
+        ndcg = ndcg_at_k(relevant_docs_list, retrieved_docs_list, k)
+        mrr = mrr_at_k(relevant_docs_list, retrieved_docs_list, k)
+        if k == -1:
+            k = 'all'
+        results[f'Recall@{k}'] = recall
+        results[f'Hit rate@{k}'] = hit_rate
+        results[f'nDCG@{k}'] = ndcg
+        results[f'MRR@{k}'] = mrr
+    return results
+
 def eval_search(examples):
     relevant_docs_list = []
     retrieved_docs_list = []

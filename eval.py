@@ -12,7 +12,7 @@ from search_engine import SearchEngine,HybridSearchEngine
 from llms.llm import LLM
 from llms.evaluator import Evaluator
 
-from utils.overall_evaluator import eval_search,eval_search_type_wise
+from utils.overall_evaluator import eval_search,eval_search_type_wise, eval_sample_search
 from vidorag_agents import ViDoRAG_Agents
 
 class MMRAG:
@@ -77,6 +77,7 @@ class MMRAG:
         recall_results = self.search_engine.search(query)
         recall_results['source_nodes'] = recall_results['source_nodes'][:100]
         sample['recall_results'] = recall_results
+        sample['retrieval_metrics'] = eval_sample_search(sample)
         return sample
     def vidorag(self,sample):
         query = sample['query']
@@ -97,6 +98,7 @@ class MMRAG:
             source_nodes=[NodeWithScore(node=ImageNode(image_path=image,metadata=dict(file_name=image)), score=None).to_dict() for image in candidate_image],
             response=None,
             metadata=None)
+        sample['retrieval_metrics'] = eval_sample_search(sample)
         return sample
 
 
