@@ -152,7 +152,7 @@ def _to_readable_record(record: Dict[str, Any]) -> Dict[str, Any]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Filter lowest-score samples from eval results.")
-    parser.add_argument("--input", required=True, help="Path to result file (.jsonl or .json)")
+    parser.add_argument("--input", default="data/ViDoSeek/results/vidorag_openbmb-EVisRAG-7B.jsonl", help="Path to result file (.jsonl or .json)")
     parser.add_argument("--top_n", type=int, default=20, help="How many lowest-score samples to show")
     parser.add_argument(
         "--min_score",
@@ -162,7 +162,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--output",
-        default=None,
+        default="data/ViDoSeek/results/vidorag_openbmb-EVisRAG-7B_lowest10.json",
         help="Optional output path to save filtered samples as JSON",
     )
     args = parser.parse_args()

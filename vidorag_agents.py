@@ -9,6 +9,24 @@ from agent.map_dict import arrangement_map_dict,page_map_dict_normal,page_map_di
 from utils.parse_tool import extract_json
 from utils.image_preprosser import concat_images_with_bbox
 
+def _trace_add(trace, agent, event, **kwargs):
+    if trace is None:
+        return
+    item = {
+        "agent": agent,
+        "event": event,
+    }
+    item.update(kwargs)
+    trace.append(item)
+
+def _truncate_text(text, max_len=1500):
+    if text is None:
+        return None
+    text = str(text)
+    if len(text) <= max_len:
+        return text
+    return text[:max_len] + "...<truncated>"
+
 class Seeker:
     def __init__(self, vlm):
         self.vlm = vlm
@@ -18,16 +36,33 @@ class Seeker:
             self.page_map = page_map_dict_normal
         else:
             self.page_map = page_map_dict
-    def run(self, query=None, images_path=None, feedback=None):
+    def run(self, query=None, images_path=None, feedback=None, trace=None):
 
         if query is not None and images_path is not None:
             self.buffer_images = images_path
             self.query = query
             prompt = seeker_prompt.replace('{question}', self.query).replace('{page_map}', self.page_map[len(self.buffer_images)])
+            _trace_add(
+                trace,
+                agent="seeker",
+                event="start",
+                mode="initial",
+                candidate_images=list(self.buffer_images),
+                prompt=_truncate_text(prompt),
+            )
         
         elif feedback is not None:
             additional_information = self.query + '\n\n## Additional Information\n' + feedback
-            prompt = seeker_prompt.replace('{question}', additional_information).replace('{page_map}', self.page_map[len(self.buffer_images)])        
+            prompt = seeker_prompt.replace('{question}', additional_information).replace('{page_map}', self.page_map[len(self.buffer_images)])
+            _trace_add(
+                trace,
+                agent="seeker",
+                event="start",
+                mode="feedback",
+                feedback=feedback,
+                candidate_images=list(self.buffer_images),
+                prompt=_truncate_text(prompt),
+            )
 
         if self.seeker_multi_image:
             input_images = self.buffer_images
@@ -42,6 +77,13 @@ class Seeker:
             times += 1
             select_response = self.vlm.generate(query=prompt, image=input_images, mode="seeker")
             print(select_response)
+            _trace_add(
+                trace,
+                agent="seeker",
+                event="llm_response",
+                attempt=times,
+                raw_response=_truncate_text(select_response),
+            )
             try:
                 select_response_json = extract_json(select_response)
                 reason = select_response_json.get('reason', None)
@@ -58,11 +100,30 @@ class Seeker:
                 )
                 selected_images = [self.buffer_images[page] for page in valid_page_num]
                 self.buffer_images = [image for image in self.buffer_images if image not in selected_images]
+                _trace_add(
+                    trace,
+                    agent="seeker",
+                    event="selection",
+                    attempt=times,
+                    reason=reason,
+                    summary=summary,
+                    choice=select_page_num,
+                    normalized_choice=valid_page_num,
+                    selected_images=selected_images,
+                    remaining_images=list(self.buffer_images),
+                )
 
             except Exception as e:
                 print(e)
                 print(select_response)
                 print('seeker')
+                _trace_add(
+                    trace,
+                    agent="seeker",
+                    event="parse_error",
+                    attempt=times,
+                    error=str(e),
+                )
                 continue
             break
         
@@ -80,14 +141,30 @@ class Inspector:
 
         self.buffer_images = []
 
-    def run(self, query, images_path):
+    def run(self, query, images_path, trace=None):
         # answer or not, (images, candidate)/feedback
         if len(self.buffer_images) == 0 and len(images_path) == 0:
+            _trace_add(trace, agent="inspector", event="empty_input")
             return None, None, None
         elif len(images_path) == 0:
+            _trace_add(
+                trace,
+                agent="inspector",
+                event="route",
+                status="synthesizer",
+                reason="no_new_images_use_buffer",
+                buffer_images=list(self.buffer_images),
+            )
             return 'synthesizer', None, self.buffer_images
         elif len(images_path) != 0:
             self.buffer_images.extend(images_path)
+            _trace_add(
+                trace,
+                agent="inspector",
+                event="start",
+                input_images=list(images_path),
+                merged_buffer=list(self.buffer_images),
+            )
 
         if self.inspector_multi_image:
             input_images = self.buffer_images
@@ -105,6 +182,13 @@ class Inspector:
 
             response = self.vlm.generate(query=prompt,image=input_images, mode="inspector")
             print(response)
+            _trace_add(
+                trace,
+                agent="inspector",
+                event="llm_response",
+                attempt=times,
+                raw_response=_truncate_text(response),
+            )
             try:
                 response_json = extract_json(response)
                 # thought
@@ -126,12 +210,46 @@ class Inspector:
                         empty_fallback="error",
                     )
                     if len(valid_ref) == len(self.buffer_images):
+                        _trace_add(
+                            trace,
+                            agent="inspector",
+                            event="route",
+                            status="answer",
+                            attempt=times,
+                            reason=reason,
+                            answer=answer,
+                            reference=ref,
+                            normalized_reference=valid_ref,
+                        )
                         return 'answer', answer, self.buffer_images
                     else:
                         ref_images = [self.buffer_images[page] for page in valid_ref]
+                        _trace_add(
+                            trace,
+                            agent="inspector",
+                            event="route",
+                            status="synthesizer",
+                            attempt=times,
+                            reason=reason,
+                            answer=answer,
+                            reference=ref,
+                            normalized_reference=valid_ref,
+                            selected_images=ref_images,
+                        )
                         return 'synthesizer', answer, ref_images
                 elif info is not None and choice is not None:
                     if len(choice) == 0:
+                        _trace_add(
+                            trace,
+                            agent="inspector",
+                            event="route",
+                            status="seeker",
+                            attempt=times,
+                            reason=reason,
+                            information=info,
+                            choice=choice,
+                            selected_images=list(self.buffer_images),
+                        )
                         return 'seeker', info, self.buffer_images
                     valid_choice = _normalize_indices(
                         choice,
@@ -140,11 +258,30 @@ class Inspector:
                         empty_fallback="error",
                     )
                     self.buffer_images = [self.buffer_images[page] for page in valid_choice]
+                    _trace_add(
+                        trace,
+                        agent="inspector",
+                        event="route",
+                        status="seeker",
+                        attempt=times,
+                        reason=reason,
+                        information=info,
+                        choice=choice,
+                        normalized_choice=valid_choice,
+                        selected_images=list(self.buffer_images),
+                    )
                     return 'seeker', info, self.buffer_images
             
             except Exception as e:
                 print(e)
                 print("inspector")
+                _trace_add(
+                    trace,
+                    agent="inspector",
+                    event="parse_error",
+                    attempt=times,
+                    error=str(e),
+                )
                 continue
 
 class Synthesizer:
@@ -156,30 +293,62 @@ class Synthesizer:
         else:
             self.page_map = page_map_dict
 
-    def run(self, query, candidate_answer, ref_images):
+    def run(self, query, candidate_answer, ref_images, trace=None):
         if candidate_answer is not None:
             query = query + '\n\n## Related Information\n' + candidate_answer
         prompt = answer_prompt.replace('{question}',query).replace('{page_map}',self.page_map[len(ref_images)])
+        _trace_add(
+            trace,
+            agent="synthesizer",
+            event="start",
+            candidate_answer=candidate_answer,
+            ref_images=list(ref_images),
+            prompt=_truncate_text(prompt),
+        )
 
         if self.synthesizer_multi_image:
             input_images = ref_images
         else:
             input_images = [concat_images_with_bbox(ref_images, arrangement=arrangement_map_dict[len(ref_images)], scale=1, line_width=40)]
         
+        times = 0
         while True:
+            times += 1
             final_answer_response = self.vlm.generate(query=prompt,image=input_images, mode="synthesizer")
             print(final_answer_response)
+            _trace_add(
+                trace,
+                agent="synthesizer",
+                event="llm_response",
+                attempt=times,
+                raw_response=_truncate_text(final_answer_response),
+            )
             try:
                 final_answer_response_json = extract_json(final_answer_response)
                 reason = final_answer_response_json.get('reason',None)
                 answer = final_answer_response_json.get('answer',None)
                 if reason is None or answer is None:
                     raise Exception('answer missing')
+                _trace_add(
+                    trace,
+                    agent="synthesizer",
+                    event="final_answer",
+                    attempt=times,
+                    reason=reason,
+                    answer=answer,
+                )
                 return reason, answer
             except Exception as e:
                 print(e)
                 print(final_answer_response)
                 print("answer")
+                _trace_add(
+                    trace,
+                    agent="synthesizer",
+                    event="parse_error",
+                    attempt=times,
+                    error=str(e),
+                )
                 continue
 
 class ViDoRAG_Agents:
@@ -188,25 +357,46 @@ class ViDoRAG_Agents:
         self.inspector = Inspector(vlm)
         self.synthesizer = Synthesizer(vlm)
 
-    def run_agent(self, query, images_path):
+    def run_agent(self, query, images_path, return_trace=False):
         # initial
         self.seeker.buffer_images = None
         self.inspector.buffer_images = []
+        trace = [] if return_trace else None
 
-        selected_images, summary, reason = self.seeker.run(query=query, images_path=images_path)
+        selected_images, summary, reason = self.seeker.run(query=query, images_path=images_path, trace=trace)
         # iter
+        step = 0
         while True:
-            status, information, images = self.inspector.run(query, selected_images)
+            step += 1
+            _trace_add(
+                trace,
+                agent="coordinator",
+                event="loop",
+                step=step,
+                selected_images=list(selected_images) if selected_images is not None else None,
+            )
+            status, information, images = self.inspector.run(query, selected_images, trace=trace)
             if status == 'answer':
+                if return_trace:
+                    _trace_add(trace, agent="coordinator", event="finish", status="answer", answer=information)
+                    return information, trace
                 return information
             elif status == 'synthesizer':
-                reason, answer = self.synthesizer.run(query, information, images)
+                reason, answer = self.synthesizer.run(query, information, images, trace=trace)
+                if return_trace:
+                    _trace_add(trace, agent="coordinator", event="finish", status="synthesizer", answer=answer, reason=reason)
+                    return answer, trace
                 return answer
             elif status == 'seeker':
-                selected_images, summary, reason = self.seeker.run(feedback=information)
+                selected_images, summary, reason = self.seeker.run(feedback=information, trace=trace)
                 continue
             else:
                 print('No related information')
+                if return_trace:
+                    _trace_add(trace, agent="coordinator", event="finish", status="none", answer=None)
+                    return None, trace
+        if return_trace:
+            return None, trace
         return None
 
 def _normalize_indices(indices, buffer_len, label="indices", empty_fallback="error"):
